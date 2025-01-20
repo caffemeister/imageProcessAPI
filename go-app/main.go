@@ -1,9 +1,7 @@
 package main
 
 import (
-	"log"
 	"net/http"
-	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -11,34 +9,37 @@ import (
 
 var uploadDir = "./../uploads/"
 var maxFileSize = 10 << 20 // ~10 mb
+var allowedExtensions = []string{"png", "jpg", "jpeg"}
+
+type Config struct {
+	UploadDir         string
+	MaxFileSize       int
+	AllowedExtensions []string
+}
 
 func main() {
-	checkUploadDirExists()
+	app := &Config{
+		UploadDir:         uploadDir,
+		MaxFileSize:       maxFileSize,
+		AllowedExtensions: allowedExtensions,
+	}
+
+	// check for ./uploads/
+	app.checkUploadDirExists()
 
 	// create a new router
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
+	// POST
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Hello, world!"))
 	})
-	r.Post("/upload", handleFileUpload)
+	r.Post("/upload", app.handleFileUpload)
+
+	// GET
+	r.Get("/files", app.showFiles)
 
 	http.ListenAndServe(":8080", r)
-}
-
-// Checks if upload dir exists, if not, creates it
-func checkUploadDirExists() {
-	stat, err := os.Stat(uploadDir)
-
-	if err == nil && stat.IsDir() {
-		return
-	} else {
-		err := os.MkdirAll(uploadDir, os.ModePerm)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-	}
 }
