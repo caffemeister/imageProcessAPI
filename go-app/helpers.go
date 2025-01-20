@@ -13,12 +13,14 @@ func (app *Config) checkUploadDirExists() {
 
 	if err == nil && stat.IsDir() {
 		return
-	} else {
+	} else if !stat.IsDir() {
 		err := os.MkdirAll(app.UploadDir, os.ModePerm)
 		if err != nil {
 			log.Println(err)
 			return
 		}
+	} else {
+		panic(err)
 	}
 }
 
