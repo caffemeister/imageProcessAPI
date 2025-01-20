@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -11,9 +10,10 @@ import (
 )
 
 var uploadDir = "./../uploads/"
+var maxFileSize = 10 << 20 // ~10 mb
 
 func main() {
-	checkUploadDir()
+	checkUploadDirExists()
 
 	// create a new router
 	r := chi.NewRouter()
@@ -23,50 +23,13 @@ func main() {
 	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Hello, world!"))
 	})
-
-	r.Post("/upload", func(w http.ResponseWriter, r *http.Request) {
-		// parse the r.Body and save it in memory
-		err := r.ParseMultipartForm(10 << 20) // ~10 mb
-		if err != nil {
-			http.Error(w, "error parsing multipart form data", http.StatusBadRequest)
-			return
-		}
-
-		// extract the file data from memory
-		file, header, err := r.FormFile("file")
-		if err != nil {
-			log.Println("error extracting file from memory", err)
-			http.Error(w, "error extracting file from memory", http.StatusInternalServerError)
-			return
-		}
-		defer file.Close()
-
-		// create the file in uploadDir
-		dst, err := os.Create(uploadDir + header.Filename)
-		if err != nil {
-			log.Println("error creating file", err)
-			http.Error(w, "Error creating file", http.StatusInternalServerError)
-			return
-		}
-
-		// copy file contents to file
-		_, err = io.Copy(dst, file)
-		if err != nil {
-			log.Println("error saving file", err)
-			http.Error(w, "Error saving file", http.StatusInternalServerError)
-			return
-		}
-
-		// report status to user
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("File uploaded successfully"))
-	})
+	r.Post("/upload", handleFileUpload)
 
 	http.ListenAndServe(":8080", r)
 }
 
 // Checks if upload dir exists, if not, creates it
-func checkUploadDir() {
+func checkUploadDirExists() {
 	stat, err := os.Stat(uploadDir)
 
 	if err == nil && stat.IsDir() {
