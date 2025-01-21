@@ -51,6 +51,7 @@ func main() {
 
 	// POST
 	r.Post("/upload", app.handleFileUpload)
+	// TODO: ADD DELETE
 
 	// GET
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(usageInfo)) })
