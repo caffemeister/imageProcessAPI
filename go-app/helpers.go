@@ -5,6 +5,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 )
 
 // Checks if upload dir exists, if not, creates it
@@ -15,6 +16,7 @@ func (app *Config) checkUploadDirExists() {
 		if !stat.IsDir() {
 			log.Fatalf("Path %s exists but is not a directory!", app.UploadDir)
 		}
+		app.assignIDs()
 		return
 	}
 
@@ -40,9 +42,71 @@ func (app *Config) getFileExtension(file string) string {
 
 // Checks if entry is in app.AllowedExtensions
 func (app *Config) isValidImageExtension(entry string) bool {
-	if !slices.Contains(app.AllowedExtensions, entry) {
-		return false
-	} else {
-		return true
+	return slices.Contains(app.AllowedExtensions, entry)
+}
+
+func (app *Config) getFileCount() int {
+	f, err := os.Open(app.UploadDir)
+	if err != nil {
+		log.Printf("failed to get IDs -> os.Open, error: %s", err)
+	}
+
+	files, err := f.ReadDir(0)
+	if err != nil {
+		log.Printf("failed to get IDs -> f.ReadDir, error: %s", err)
+	}
+	defer f.Close()
+	return len(files)
+}
+
+// Assigns IDs to files inside app.uploadDir
+func (app *Config) assignIDs() {
+	f, err := os.Open(app.UploadDir)
+	if err != nil {
+		log.Printf("failed to get IDs -> os.Open, error: %s", err)
+		return
+	}
+	defer f.Close()
+
+	files, err := f.ReadDir(0)
+	if err != nil {
+		log.Printf("failed to get IDs -> f.ReadDir, error: %s", err)
+		return
+	}
+
+	app.Uploads = nil
+	for id, file := range files {
+		app.Uploads = append(app.Uploads, fileUpload{
+			Filename: file.Name(),
+			ID:       id,
+		})
+	}
+}
+
+func (app *Config) listenForFileChanges(doneChan chan bool) error {
+	initialStat, err := os.Stat(app.UploadDir)
+	if err != nil {
+		return err
+	}
+
+	for {
+		select {
+		case <-doneChan:
+			log.Println("stopping listenForFileChanges...")
+			return nil
+		default:
+			stat, err := os.Stat(app.UploadDir)
+			if err != nil {
+				return err
+			}
+
+			if stat.Size() != initialStat.Size() || stat.ModTime() != initialStat.ModTime() {
+				app.assignIDs()
+				initialStat = stat
+				log.Println("noticed file changes, ran assignIDs()...")
+			}
+
+			time.Sleep(1 * time.Second)
+		}
 	}
 }

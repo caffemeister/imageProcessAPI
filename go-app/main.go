@@ -8,13 +8,21 @@ import (
 )
 
 var uploadDir = "./../uploads/"
-var maxFileSize = 10 << 20 // ~10 mb
-var allowedExtensions = []string{"png", "jpg", "jpeg"}
+var maxFileSize = 10 << 20                                 // ~10 mb
+var allowedExtensions = []string{"png", "jpg", "jpeg"}     // allowed types of files
+var doneChan = make(chan bool)                             // channel for app.listenForFileChanges()
+var usageInfo = "POST: /uploads\nGET: /files, /files/<id>" // for GET to "/", shows usage
 
 type Config struct {
 	UploadDir         string
 	MaxFileSize       int
 	AllowedExtensions []string
+	Uploads           []fileUpload
+}
+
+type fileUpload struct {
+	Filename string
+	ID       int
 }
 
 func main() {
@@ -22,10 +30,13 @@ func main() {
 		UploadDir:         uploadDir,
 		MaxFileSize:       maxFileSize,
 		AllowedExtensions: allowedExtensions,
+		Uploads:           []fileUpload{},
 	}
 
 	// check for ./uploads/
 	app.checkUploadDirExists()
+	go app.listenForFileChanges(doneChan)
+	defer close(doneChan)
 
 	// create a new router
 	r := chi.NewRouter()
@@ -33,13 +44,12 @@ func main() {
 	r.Use(middleware.Recoverer)
 
 	// POST
-	r.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello, world!"))
-	})
 	r.Post("/upload", app.handleFileUpload)
 
 	// GET
-	r.Get("/files", app.showFiles)
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(usageInfo)) })
+	r.Get("/files", app.getAllFiles)
+	r.Get("/files/{fileID}", app.getFileByID)
 
 	http.ListenAndServe(":8080", r)
 }

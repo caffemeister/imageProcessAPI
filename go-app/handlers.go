@@ -3,15 +3,14 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
-)
 
-type fileUpload struct {
-	Name string
-	ID   int
-}
+	"github.com/go-chi/chi/v5"
+)
 
 // handles POST to "/upload"
 func (app *Config) handleFileUpload(w http.ResponseWriter, r *http.Request) {
@@ -60,25 +59,38 @@ func (app *Config) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	app.assignIDs()
+
 	// report status to user
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("File uploaded successfully"))
 }
 
 // handles GET to "/files"
-func (app *Config) showFiles(w http.ResponseWriter, r *http.Request) {
-	var filenames []string
+func (app *Config) getAllFiles(w http.ResponseWriter, r *http.Request) {
+	var lines []string
 
-	files, err := os.ReadDir(app.UploadDir)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed reading local files: %s", err), http.StatusInternalServerError)
-		return
-	}
-
-	for _, file := range files {
-		filenames = append(filenames, file.Name())
+	for _, upload := range app.Uploads {
+		line := upload.Filename + " > " + strconv.Itoa(upload.ID)
+		lines = append(lines, line)
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(strings.Join(filenames, ", ")))
+	w.Write([]byte(strings.Join(lines, "\n")))
+}
+
+func (app *Config) getFileByID(w http.ResponseWriter, r *http.Request) {
+	fileID, err := strconv.Atoi(chi.URLParam(r, "fileID"))
+	if err != nil {
+		log.Println(err)
+		http.Error(w, fmt.Sprintf("Error locating file by ID: %s", err), http.StatusNotFound)
+	}
+
+	for id, file := range app.Uploads {
+		if fileID == id {
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(file.Filename))
+			return
+		}
+	}
 }
