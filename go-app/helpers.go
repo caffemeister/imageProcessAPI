@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
+	"net/http"
 	"os"
 	"slices"
 	"strings"
@@ -46,17 +48,19 @@ func (app *Config) isValidImageExtension(entry string) bool {
 }
 
 func (app *Config) getFileCount() int {
-	f, err := os.Open(app.UploadDir)
-	if err != nil {
-		log.Printf("failed to get IDs -> os.Open, error: %s", err)
+	return len(app.Uploads)
+}
+
+func (app *Config) respondJSON(w http.ResponseWriter, status int, msg string, filename string) {
+	payload := jsonResponse{
+		Status:  status,
+		Message: msg,
+		File:    filename,
 	}
 
-	files, err := f.ReadDir(0)
-	if err != nil {
-		log.Printf("failed to get IDs -> f.ReadDir, error: %s", err)
-	}
-	defer f.Close()
-	return len(files)
+	w.WriteHeader(status)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(payload)
 }
 
 // Assigns IDs to files inside app.uploadDir

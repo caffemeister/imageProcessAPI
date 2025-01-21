@@ -25,6 +25,12 @@ type fileUpload struct {
 	ID       int
 }
 
+type jsonResponse struct {
+	Status  int    `json:"status"`
+	Message string `json:"message,omitempty"`
+	File    string `json:"file,omitempty"`
+}
+
 func main() {
 	app := &Config{
 		UploadDir:         uploadDir,
@@ -48,8 +54,8 @@ func main() {
 
 	// GET
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(usageInfo)) })
-	r.Get("/files", app.getAllFiles)
-	r.Get("/files/{fileID}", app.getFileByID)
+	r.Get("/files", app.handleGetAllFiles)
+	r.Get("/files/{fileID}", app.handleGetFileByID)
 
 	http.ListenAndServe(":8080", r)
 }
