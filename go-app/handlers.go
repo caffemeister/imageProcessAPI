@@ -5,7 +5,13 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 )
+
+type fileUpload struct {
+	Name string
+	ID   int
+}
 
 // handles POST to "/upload"
 func (app *Config) handleFileUpload(w http.ResponseWriter, r *http.Request) {
@@ -23,6 +29,10 @@ func (app *Config) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
+
+	// protect against problematic filenames
+	sanitizedFilename := strings.ReplaceAll(header.Filename, "../", "")
+	header.Filename = sanitizedFilename
 
 	// check if uploaded file is an allowed image type
 	if !app.isValidImageExtension(app.getFileExtension(header.Filename)) {
@@ -57,7 +67,7 @@ func (app *Config) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 
 // handles GET to "/files"
 func (app *Config) showFiles(w http.ResponseWriter, r *http.Request) {
-	var response string
+	var filenames []string
 
 	files, err := os.ReadDir(app.UploadDir)
 	if err != nil {
@@ -66,9 +76,9 @@ func (app *Config) showFiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, file := range files {
-		response += file.Name() + ", "
+		filenames = append(filenames, file.Name())
 	}
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(response))
+	w.Write([]byte(strings.Join(filenames, ", ")))
 }

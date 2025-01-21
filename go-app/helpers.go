@@ -11,16 +11,20 @@ import (
 func (app *Config) checkUploadDirExists() {
 	stat, err := os.Stat(app.UploadDir)
 
-	if err == nil && stat.IsDir() {
+	if err == nil {
+		if !stat.IsDir() {
+			log.Fatalf("Path %s exists but is not a directory!", app.UploadDir)
+		}
 		return
-	} else if !stat.IsDir() {
+	}
+
+	if os.IsNotExist(err) {
 		err := os.MkdirAll(app.UploadDir, os.ModePerm)
 		if err != nil {
-			log.Println(err)
-			return
+			log.Fatalf("Failed to create upload directory: %s", err)
 		}
 	} else {
-		panic(err)
+		log.Fatalf("Error checking upload directory: %s", err)
 	}
 }
 
