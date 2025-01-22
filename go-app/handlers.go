@@ -69,7 +69,7 @@ func (app *Config) handleGetAllFiles(w http.ResponseWriter, r *http.Request) {
 	var lines []string
 
 	for _, upload := range app.Uploads {
-		line := upload.Filename + " " + strconv.Itoa(upload.ID)
+		line := upload.Filename + " " + "[" + strconv.Itoa(upload.ID) + "]"
 		lines = append(lines, line)
 	}
 
