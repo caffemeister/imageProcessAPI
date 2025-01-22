@@ -10,9 +10,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 )
 
 const lc = "http://localhost:8080"
@@ -26,10 +23,7 @@ func TestHandleFileUpload(t *testing.T) {
 		Uploads:           []fileUpload{},
 	}
 
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Post("/upload", app.handleFileUpload)
+	r := app.routes()
 
 	fileToUpload, err := os.Open(pathToTestImage)
 	if err != nil {
@@ -80,11 +74,7 @@ func TestHandleGetAllFiles(t *testing.T) {
 		Uploads:           []fileUpload{},
 	}
 
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Get("/files", app.handleGetAllFiles)
-
+	r := app.routes()
 	app.assignIDs()
 
 	req, err := http.NewRequest(http.MethodGet, lc+"/files", nil)
@@ -118,10 +108,7 @@ func TestHandleGetFileByID(t *testing.T) {
 		Uploads:           []fileUpload{{ID: 1, Filename: "testimage.png"}},
 	}
 
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Get("/files/{fileID}", app.handleGetFileByID)
+	r := app.routes()
 	app.assignIDs()
 
 	req, err := http.NewRequest(http.MethodGet, lc+"/files/1", nil)
@@ -140,5 +127,50 @@ func TestHandleGetFileByID(t *testing.T) {
 	expected := "file found"
 	if !strings.Contains(rr.Body.String(), expected) {
 		t.Errorf("Expected response body to contain %q, got %q", expected, rr.Body.String())
+	}
+}
+
+func TestHandleDeleteFileByID(t *testing.T) {
+	app := &Config{
+		UploadDir:         uploadDir,
+		MaxFileSize:       maxFileSize,
+		AllowedExtensions: allowedExtensions,
+		Uploads:           []fileUpload{},
+	}
+
+	r := app.routes()
+	app.assignIDs()
+
+	req, err := http.NewRequest(http.MethodDelete, lc+"/files/1", nil)
+	if err != nil {
+		t.Fatal("Couldn't build request", err)
+	}
+
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+	t.Log(rr.Body)
+
+	var response jsonResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	if err != nil {
+		t.Fatal("Couldn't unmarshal into response")
+	}
+
+	if response.Status != 200 {
+		t.Error("Expected status 200, got", response.Status)
+	}
+
+	t.Log(response)
+
+	expected := "successfully"
+	if !strings.Contains(response.Message, expected) {
+		t.Errorf("Expected %s in Message, got %s", expected, response.Message)
+	}
+
+	for _, file := range app.Uploads {
+		if file.Filename == response.File {
+			t.Log(response.File)
+			t.Error("File was not removed from app.Uploads")
+		}
 	}
 }

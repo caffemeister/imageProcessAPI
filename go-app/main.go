@@ -2,9 +2,6 @@ package main
 
 import (
 	"net/http"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 )
 
 var uploadDir = "./../uploads/"
@@ -45,19 +42,7 @@ func main() {
 	defer close(doneChan)
 
 	// create a new router
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-
-	// POST
-	r.Post("/upload", app.handleFileUpload)
-
-	r.Delete("/files/{fileID}", app.handleDeleteFileByID)
-
-	// GET
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(usageInfo)) })
-	r.Get("/files", app.handleGetAllFiles)
-	r.Get("/files/{fileID}", app.handleGetFileByID)
+	r := app.routes()
 
 	http.ListenAndServe(":8080", r)
 }

@@ -1,15 +1,36 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
+
+func (app *Config) routes() *chi.Mux {
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+
+	// POST
+	r.Post("/upload", app.handleFileUpload)
+
+	// DELETE
+	r.Delete("/files/{fileID}", app.handleDeleteFileByID)
+
+	// GET
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(usageInfo)) })
+	r.Get("/files", app.handleGetAllFiles)
+	r.Get("/files/{fileID}", app.handleGetFileByID)
+	return r
+}
 
 // handles POST to "/upload"
 func (app *Config) handleFileUpload(w http.ResponseWriter, r *http.Request) {
@@ -50,6 +71,7 @@ func (app *Config) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		app.respondJSON(w, http.StatusInternalServerError, "Error creating file", "")
 		return
 	}
+	defer dst.Close()
 
 	// copy file contents to file
 	_, err = io.Copy(dst, file)
@@ -103,16 +125,20 @@ func (app *Config) handleDeleteFileByID(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	for id, file := range app.Uploads {
-		if fileID == id {
+	for _, file := range app.Uploads {
+		fmt.Println(fileID, file.ID, file.Filename)
+		if fileID == file.ID {
 			fileToRemove = file.Filename
-			err = os.Remove("./../uploads/" + fileToRemove)
+			err = os.Remove(filepath.Join(app.UploadDir, fileToRemove))
 			if err != nil {
 				log.Println(err)
 				app.respondJSON(w, http.StatusInternalServerError, "Failed to remove file", fileToRemove)
 			}
+			app.assignIDs()
 			app.respondJSON(w, http.StatusOK, "File successfully deleted", fileToRemove)
 			return
 		}
 	}
+
+	app.respondJSON(w, http.StatusInternalServerError, "Failed to find file to delete", fileToRemove)
 }
