@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -100,6 +99,7 @@ func (app *Config) handleGetAllFiles(w http.ResponseWriter, r *http.Request) {
 
 // handles GET to "/files/<fileID>"
 func (app *Config) handleGetFileByID(w http.ResponseWriter, r *http.Request) {
+	// retrieve fileID specified by user
 	fileID, err := strconv.Atoi(chi.URLParam(r, "fileID"))
 	if err != nil {
 		log.Println(err)
@@ -118,6 +118,8 @@ func (app *Config) handleGetFileByID(w http.ResponseWriter, r *http.Request) {
 
 func (app *Config) handleDeleteFileByID(w http.ResponseWriter, r *http.Request) {
 	var fileToRemove string
+
+	// retrieve fileID specified by user
 	fileID, err := strconv.Atoi(chi.URLParam(r, "fileID"))
 	if err != nil {
 		log.Println(err)
@@ -125,8 +127,8 @@ func (app *Config) handleDeleteFileByID(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// find and remove the file, then run assignIDs
 	for _, file := range app.Uploads {
-		fmt.Println(fileID, file.ID, file.Filename)
 		if fileID == file.ID {
 			fileToRemove = file.Filename
 			err = os.Remove(filepath.Join(app.UploadDir, fileToRemove))

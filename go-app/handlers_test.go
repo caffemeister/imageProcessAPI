@@ -25,20 +25,26 @@ func TestHandleFileUpload(t *testing.T) {
 
 	r := app.routes()
 
+	// open the file
 	fileToUpload, err := os.Open(pathToTestImage)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer fileToUpload.Close()
 
+	// create an empty requestBody
 	var requestBody bytes.Buffer
+	// and populate it with an empty multipart/data-file form
 	writer := multipart.NewWriter(&requestBody)
 
+	// create a multipart/data-file header with key "file" and
+	// value "testimage.png" in the form, save that to part
 	part, err := writer.CreateFormFile("file", "testimage.png")
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// copy fileToUpload's data into part
 	_, err = io.Copy(part, fileToUpload)
 	if err != nil {
 		t.Fatal("Failed to copy file contents:", err)
@@ -46,14 +52,17 @@ func TestHandleFileUpload(t *testing.T) {
 
 	writer.Close()
 
+	// build a new request
 	req, err := http.NewRequest(http.MethodPost, lc+"/upload", &requestBody)
 	if err != nil {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", writer.FormDataContentType())
 
+	// create a recorder for the response
 	rr := httptest.NewRecorder()
 
+	// send the request, save response to recorder
 	r.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
@@ -148,7 +157,6 @@ func TestHandleDeleteFileByID(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	r.ServeHTTP(rr, req)
-	t.Log(rr.Body)
 
 	var response jsonResponse
 	err = json.Unmarshal(rr.Body.Bytes(), &response)
@@ -160,8 +168,6 @@ func TestHandleDeleteFileByID(t *testing.T) {
 		t.Error("Expected status 200, got", response.Status)
 	}
 
-	t.Log(response)
-
 	expected := "successfully"
 	if !strings.Contains(response.Message, expected) {
 		t.Errorf("Expected %s in Message, got %s", expected, response.Message)
@@ -169,7 +175,6 @@ func TestHandleDeleteFileByID(t *testing.T) {
 
 	for _, file := range app.Uploads {
 		if file.Filename == response.File {
-			t.Log(response.File)
 			t.Error("File was not removed from app.Uploads")
 		}
 	}
