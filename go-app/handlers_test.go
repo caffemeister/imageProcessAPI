@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -83,16 +85,28 @@ func TestHandleGetAllFiles(t *testing.T) {
 	r.Use(middleware.Recoverer)
 	r.Get("/files", app.handleGetAllFiles)
 
+	app.assignIDs()
+
 	req, err := http.NewRequest(http.MethodGet, lc+"/files", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	rr := httptest.NewRecorder()
-
 	r.ServeHTTP(rr, req)
 
-	if rr.Code != http.StatusOK {
+	var response jsonResponse
+	err = json.Unmarshal(rr.Body.Bytes(), &response)
+	if err != nil {
+		t.Fatal("Failed to unmarshal response body:", err)
+	}
+
+	if response.Status != http.StatusOK {
 		t.Error("GET to '/files' -> expected code 200, got code", rr.Code)
+	}
+
+	expected := "testimage.png"
+	if !strings.Contains(response.Message, expected) {
+		t.Errorf("Expected response body to contain %q, got %q", expected, rr.Body.String())
 	}
 }
 
