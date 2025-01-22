@@ -32,8 +32,6 @@ type jsonResponse struct {
 }
 
 func main() {
-
-	// write tests now, after they pass, you can merge testing or json-responses into master and continue
 	app := &Config{
 		UploadDir:         uploadDir,
 		MaxFileSize:       maxFileSize,
@@ -53,7 +51,8 @@ func main() {
 
 	// POST
 	r.Post("/upload", app.handleFileUpload)
-	// TODO: ADD DELETE
+
+	r.Delete("/files/{fileID}", app.handleDeleteFileByID)
 
 	// GET
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(usageInfo)) })

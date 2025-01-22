@@ -93,3 +93,26 @@ func (app *Config) handleGetFileByID(w http.ResponseWriter, r *http.Request) {
 	}
 	app.respondJSON(w, http.StatusNotFound, "Error locating file by ID: file does not exist!", "")
 }
+
+func (app *Config) handleDeleteFileByID(w http.ResponseWriter, r *http.Request) {
+	var fileToRemove string
+	fileID, err := strconv.Atoi(chi.URLParam(r, "fileID"))
+	if err != nil {
+		log.Println(err)
+		app.respondJSON(w, http.StatusInternalServerError, "Error retrieving fileID!", "")
+		return
+	}
+
+	for id, file := range app.Uploads {
+		if fileID == id {
+			fileToRemove = file.Filename
+			err = os.Remove("./../uploads/" + fileToRemove)
+			if err != nil {
+				log.Println(err)
+				app.respondJSON(w, http.StatusInternalServerError, "Failed to remove file", fileToRemove)
+			}
+			app.respondJSON(w, http.StatusOK, "File successfully deleted", fileToRemove)
+			return
+		}
+	}
+}
