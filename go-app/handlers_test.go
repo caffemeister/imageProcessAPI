@@ -64,7 +64,6 @@ func TestHandleFileUpload(t *testing.T) {
 		t.Error("POST to '/upload' -> expected code 200, got code", rr.Code)
 	}
 
-	// Check response body
 	expected := "File uploaded successfully"
 	if !bytes.Contains(rr.Body.Bytes(), []byte(expected)) {
 		t.Errorf("Expected response body to contain %q, got %q", expected, rr.Body.String())
@@ -124,7 +123,6 @@ func TestHandleGetFileByID(t *testing.T) {
 		t.Error("GET to '/files/1' -> expected code 200, got code", rr.Code)
 	}
 
-	// Check response body
 	expected := "file found"
 	if !bytes.Contains(rr.Body.Bytes(), []byte(expected)) {
 		t.Errorf("Expected response body to contain %q, got %q", expected, rr.Body.String())
