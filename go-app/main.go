@@ -32,6 +32,8 @@ type jsonResponse struct {
 }
 
 func main() {
+
+	// write tests now, after they pass, you can merge testing or json-responses into master and continue
 	app := &Config{
 		UploadDir:         uploadDir,
 		MaxFileSize:       maxFileSize,
