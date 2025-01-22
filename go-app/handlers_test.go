@@ -138,7 +138,7 @@ func TestHandleGetFileByID(t *testing.T) {
 	}
 
 	expected := "file found"
-	if !bytes.Contains(rr.Body.Bytes(), []byte(expected)) {
+	if !strings.Contains(rr.Body.String(), expected) {
 		t.Errorf("Expected response body to contain %q, got %q", expected, rr.Body.String())
 	}
 }
