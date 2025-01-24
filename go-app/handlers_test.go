@@ -144,11 +144,9 @@ func TestHandleDeleteFileByID(t *testing.T) {
 		UploadDir:         uploadDir,
 		MaxFileSize:       maxFileSize,
 		AllowedExtensions: allowedExtensions,
-		Uploads:           []fileUpload{},
 	}
 
 	r := app.routes()
-	app.assignIDs()
 
 	req, err := http.NewRequest(http.MethodDelete, lc+"/files/1", nil)
 	if err != nil {

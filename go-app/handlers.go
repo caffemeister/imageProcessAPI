@@ -1,11 +1,12 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"io"
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -79,7 +80,14 @@ func (app *Config) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app.assignIDs()
+	// put the filename into DB
+	query := "INSERT INTO uploads (filename) VALUES ($1)"
+	_, err = app.Connection.Exec(context.Background(), query, sanitizedFilename)
+	if err != nil {
+		log.Println(err)
+		app.respondJSON(w, http.StatusInternalServerError, "Error saving file to database", sanitizedFilename)
+		return
+	}
 
 	// report status to user
 	app.respondJSON(w, http.StatusOK, "File uploaded successfully", sanitizedFilename)
@@ -87,13 +95,26 @@ func (app *Config) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 
 // handles GET to "/files"
 func (app *Config) handleGetAllFiles(w http.ResponseWriter, r *http.Request) {
+	query := "SELECT id, filename FROM uploads WHERE 1=1"
+	rows, err := app.Connection.Query(context.Background(), query)
+	if err != nil {
+		app.respondJSON(w, http.StatusInternalServerError, "Failed to retrieve files from database", "")
+	}
+	defer rows.Close()
+
 	var lines []string
 
-	for _, upload := range app.Uploads {
-		line := upload.Filename + " " + "[" + strconv.Itoa(upload.ID) + "]"
+	for rows.Next() {
+		var filename string
+		var fileID int
+		err := rows.Scan(&fileID, &filename)
+		if err != nil {
+			app.respondJSON(w, http.StatusInternalServerError, "Error reading row data", "")
+			return
+		}
+		line := filename + " " + "[" + strconv.Itoa(fileID) + "]"
 		lines = append(lines, line)
 	}
-
 	app.respondJSON(w, http.StatusOK, strings.Join(lines, ", "), "")
 }
 
@@ -107,40 +128,55 @@ func (app *Config) handleGetFileByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	for id, file := range app.Uploads {
-		if fileID == id {
-			app.respondJSON(w, http.StatusOK, "file found", file.Filename)
-			return
-		}
-	}
-	app.respondJSON(w, http.StatusNotFound, "Error locating file by ID: file does not exist!", "")
-}
+	query := "SELECT filename FROM uploads WHERE id = $1"
+	row := app.Connection.QueryRow(context.Background(), query, fileID)
 
-func (app *Config) handleDeleteFileByID(w http.ResponseWriter, r *http.Request) {
-	var fileToRemove string
-
-	// retrieve fileID specified by user
-	fileID, err := strconv.Atoi(chi.URLParam(r, "fileID"))
+	var filename string
+	err = row.Scan(&filename)
 	if err != nil {
-		log.Println(err)
-		app.respondJSON(w, http.StatusInternalServerError, "Error retrieving fileID!", "")
+		app.respondJSON(w, http.StatusNotFound, "failed to locate file with this ID", "")
 		return
 	}
 
-	// find and remove the file, then run assignIDs
-	for _, file := range app.Uploads {
-		if fileID == file.ID {
-			fileToRemove = file.Filename
-			err = os.Remove(filepath.Join(app.UploadDir, fileToRemove))
-			if err != nil {
-				log.Println(err)
-				app.respondJSON(w, http.StatusInternalServerError, "Failed to remove file", fileToRemove)
-			}
-			app.assignIDs()
-			app.respondJSON(w, http.StatusOK, "File successfully deleted", fileToRemove)
-			return
-		}
+	app.respondJSON(w, http.StatusOK, "file found", filename)
+}
+
+func (app *Config) handleDeleteFileByID(w http.ResponseWriter, r *http.Request) {
+	// get the fileID to delete
+	fileID, err := strconv.Atoi(chi.URLParam(r, "fileID"))
+	if err != nil {
+		app.respondJSON(w, http.StatusBadRequest, "Invalid file ID", "")
+		return
 	}
 
-	app.respondJSON(w, http.StatusInternalServerError, "Failed to find file to delete", fileToRemove)
+	// find the file in DB
+	var filename string
+	query := "SELECT filename FROM uploads WHERE id = $1"
+	err = app.Connection.QueryRow(context.Background(), query, fileID).Scan(&filename)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			app.respondJSON(w, http.StatusNotFound, "File not found", "")
+		} else {
+			app.respondJSON(w, http.StatusInternalServerError, "Error querying database", "")
+		}
+		return
+	}
+
+	// remove locally
+	filePath := "./../uploads/" + filename
+	err = os.Remove(filePath)
+	if err != nil {
+		app.respondJSON(w, http.StatusInternalServerError, "Failed to remove file from filesystem", "")
+		return
+	}
+
+	// remove in DB
+	deleteQuery := "DELETE FROM uploads WHERE id = $1"
+	_, err = app.Connection.Exec(context.Background(), deleteQuery, fileID)
+	if err != nil {
+		app.respondJSON(w, http.StatusInternalServerError, "Failed to delete file record from database", "")
+		return
+	}
+
+	app.respondJSON(w, http.StatusOK, "File successfully deleted", "")
 }
