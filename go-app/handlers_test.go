@@ -2,14 +2,18 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	_ "github.com/jackc/pgx/v5"
 )
 
 const lc = "http://localhost:8080"
@@ -17,13 +21,13 @@ const lc = "http://localhost:8080"
 func TestHandleFileUpload(t *testing.T) {
 	pathToTestImage := "./../testimage.png"
 	app := &Config{
+		Connection:        connectToDB(),
 		UploadDir:         uploadDir,
 		MaxFileSize:       maxFileSize,
 		AllowedExtensions: allowedExtensions,
-		Uploads:           []fileUpload{},
 	}
-
 	r := app.routes()
+	defer app.Connection.Close(context.TODO())
 
 	// open the file
 	fileToUpload, err := os.Open(pathToTestImage)
@@ -73,18 +77,40 @@ func TestHandleFileUpload(t *testing.T) {
 	if !bytes.Contains(rr.Body.Bytes(), []byte(expected)) {
 		t.Errorf("Expected response body to contain %q, got %q", expected, rr.Body.String())
 	}
+
+	// check if file is in DB
+	filename := filepath.Base(pathToTestImage)
+	query := "SELECT filename FROM uploads WHERE filename = $1"
+	row := app.Connection.QueryRow(context.Background(), query, filename)
+	var dbFile string
+	row.Scan(&dbFile)
+	if dbFile != filename {
+		t.Error("couldn't find file in DB")
+	}
+
+	// check if file is in uploadDir
+	files, err := os.ReadDir(app.UploadDir)
+	if err != nil {
+		t.Error(err)
+	}
+	for _, fileName := range files {
+		if fileName.Name() == filename {
+			return
+		}
+	}
+	t.Error("couldn't find testfile in app.UploadDir")
+
 }
 
 func TestHandleGetAllFiles(t *testing.T) {
 	app := &Config{
+		Connection:        connectToDB(),
 		UploadDir:         uploadDir,
 		MaxFileSize:       maxFileSize,
 		AllowedExtensions: allowedExtensions,
-		Uploads:           []fileUpload{},
 	}
-
 	r := app.routes()
-	app.assignIDs()
+	defer app.Connection.Close(context.TODO())
 
 	req, err := http.NewRequest(http.MethodGet, lc+"/files", nil)
 	if err != nil {
@@ -111,16 +137,20 @@ func TestHandleGetAllFiles(t *testing.T) {
 
 func TestHandleGetFileByID(t *testing.T) {
 	app := &Config{
+		Connection:        connectToDB(),
 		UploadDir:         uploadDir,
 		MaxFileSize:       maxFileSize,
 		AllowedExtensions: allowedExtensions,
-		Uploads:           []fileUpload{{ID: 1, Filename: "testimage.png"}},
 	}
-
 	r := app.routes()
-	app.assignIDs()
+	defer app.Connection.Close(context.TODO())
 
-	req, err := http.NewRequest(http.MethodGet, lc+"/files/1", nil)
+	var randID string
+	query := "SELECT id FROM uploads ORDER BY random() LIMIT 1;"
+	row := app.Connection.QueryRow(context.TODO(), query)
+	row.Scan(&randID)
+
+	req, err := http.NewRequest(http.MethodGet, lc+"/files/"+randID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +160,7 @@ func TestHandleGetFileByID(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	if rr.Code != http.StatusOK {
-		t.Error("GET to '/files/1' -> expected code 200, got code", rr.Code)
+		t.Error("GET to '/files/<random>' -> expected code 200, got code", rr.Code)
 	}
 
 	expected := "file found"
@@ -141,14 +171,25 @@ func TestHandleGetFileByID(t *testing.T) {
 
 func TestHandleDeleteFileByID(t *testing.T) {
 	app := &Config{
+		Connection:        connectToDB(),
 		UploadDir:         uploadDir,
 		MaxFileSize:       maxFileSize,
 		AllowedExtensions: allowedExtensions,
 	}
-
 	r := app.routes()
+	defer app.Connection.Close(context.TODO())
 
-	req, err := http.NewRequest(http.MethodDelete, lc+"/files/1", nil)
+	initStat, err := os.Stat(app.UploadDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var randID string
+	query := "SELECT id FROM uploads ORDER BY random() LIMIT 1;"
+	row := app.Connection.QueryRow(context.TODO(), query)
+	row.Scan(&randID)
+
+	req, err := http.NewRequest(http.MethodDelete, lc+"/files/"+randID, nil)
 	if err != nil {
 		t.Fatal("Couldn't build request", err)
 	}
@@ -171,9 +212,12 @@ func TestHandleDeleteFileByID(t *testing.T) {
 		t.Errorf("Expected %s in Message, got %s", expected, response.Message)
 	}
 
-	for _, file := range app.Uploads {
-		if file.Filename == response.File {
-			t.Error("File was not removed from app.Uploads")
-		}
+	newStat, err := os.Stat(app.UploadDir)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if initStat == newStat {
+		t.Error("File wasn't deleted")
 	}
 }
