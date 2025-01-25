@@ -80,9 +80,9 @@ func (app *Config) handleUpscale(w http.ResponseWriter, r *http.Request) {
 		app.respondJSON(w, http.StatusInternalServerError, "failed to create request", "")
 		return
 	}
-
 	req.Header.Set("Content-Type", "application/json")
 
+	// send the request to python and retrieve response
 	client := &http.Client{}
 	response, err := client.Do(req)
 	if err != nil {
@@ -92,10 +92,12 @@ func (app *Config) handleUpscale(w http.ResponseWriter, r *http.Request) {
 	}
 	defer response.Body.Close()
 
+	// process response
 	if response.StatusCode != 200 {
 		app.respondJSON(w, http.StatusInternalServerError, "bad status received from python service", filename)
 	}
 
+	// respond to user
 	app.respondJSON(w, http.StatusOK, "file upscaled successfully!", filename)
 }
 
