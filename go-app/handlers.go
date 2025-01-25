@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"io"
 	"log"
 	"net/http"
@@ -22,6 +24,7 @@ func (app *Config) routes() *chi.Mux {
 
 	// POST
 	r.Post("/upload", app.handleFileUpload)
+	r.Post("/upscale/{fileID}", app.handleUpscale)
 
 	// DELETE
 	r.Delete("/files/{fileID}", app.handleDeleteFileByID)
@@ -31,6 +34,69 @@ func (app *Config) routes() *chi.Mux {
 	r.Get("/files", app.handleGetAllFiles)
 	r.Get("/files/{fileID}", app.handleGetFileByID)
 	return r
+}
+
+func (app *Config) handleUpscale(w http.ResponseWriter, r *http.Request) {
+	// retrieve fileid from request
+	fileID, err := strconv.Atoi(chi.URLParam(r, "fileID"))
+	if err != nil {
+		log.Println(err)
+		app.respondJSON(w, http.StatusInternalServerError, "Error retrieving fileID parameter!", "")
+		return
+	}
+
+	// 3 sec timeout for db query
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	// query the db for file
+	query := "SELECT filename FROM uploads WHERE id = $1"
+	row := app.Connection.QueryRow(ctx, query, fileID)
+	var filename string
+	err = row.Scan(&filename)
+	if err != nil {
+		log.Println(err)
+		app.respondJSON(w, http.StatusInternalServerError, "failed to retrieve filename from db", "")
+		return
+	}
+
+	// create a JSON structure to send to python
+	jsonMap := map[string]string{
+		"filename": filename,
+	}
+
+	// add data to structure
+	jsonData, err := json.Marshal(jsonMap)
+	if err != nil {
+		log.Println("error marshalling data:", err)
+		app.respondJSON(w, http.StatusInternalServerError, "failed to prepare data as JSON", "")
+		return
+	}
+
+	// create a new request to send to python
+	req, err := http.NewRequest(http.MethodPost, "", bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Println("error creating request:", err)
+		app.respondJSON(w, http.StatusInternalServerError, "failed to create request", "")
+		return
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	response, err := client.Do(req)
+	if err != nil {
+		log.Println("error contacting python service:", err)
+		app.respondJSON(w, http.StatusInternalServerError, "failed to contact python service", "")
+		return
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != 200 {
+		app.respondJSON(w, http.StatusInternalServerError, "bad status received from python service", filename)
+	}
+
+	app.respondJSON(w, http.StatusOK, "file upscaled successfully!", filename)
 }
 
 // handles POST to "/upload"
