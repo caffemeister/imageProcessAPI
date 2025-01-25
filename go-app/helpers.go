@@ -8,6 +8,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 )
 
 // Checks if upload dir exists, if not, creates it
@@ -48,8 +49,13 @@ func (app *Config) isValidImageExtension(entry string) bool {
 
 func (app *Config) getFileCount() int {
 	var fileCount int
+
+	// 3 second timer for query
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	query := "SELECT COUNT(*) FROM uploads WHERE 1=1"
-	err := app.Connection.QueryRow(context.Background(), query).Scan(&fileCount)
+	err := app.Connection.QueryRow(ctx, query).Scan(&fileCount)
 	if err != nil {
 		log.Println(err)
 		return -1

@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -80,9 +81,13 @@ func (app *Config) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 3 second time limit for db query
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	// put the filename into DB
 	query := "INSERT INTO uploads (filename) VALUES ($1)"
-	_, err = app.Connection.Exec(context.Background(), query, sanitizedFilename)
+	_, err = app.Connection.Exec(ctx, query, sanitizedFilename)
 	if err != nil {
 		log.Println(err)
 		app.respondJSON(w, http.StatusInternalServerError, "Error saving file to database", sanitizedFilename)
@@ -96,7 +101,12 @@ func (app *Config) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 // handles GET to "/files"
 func (app *Config) handleGetAllFiles(w http.ResponseWriter, r *http.Request) {
 	query := "SELECT id, filename FROM uploads WHERE 1=1"
-	rows, err := app.Connection.Query(context.Background(), query)
+
+	// 3 second time limit for db query
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	rows, err := app.Connection.Query(ctx, query)
 	if err != nil {
 		app.respondJSON(w, http.StatusInternalServerError, "Failed to retrieve files from database", "")
 	}
@@ -128,8 +138,12 @@ func (app *Config) handleGetFileByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 3 second time limit for db query
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	query := "SELECT filename FROM uploads WHERE id = $1"
-	row := app.Connection.QueryRow(context.Background(), query, fileID)
+	row := app.Connection.QueryRow(ctx, query, fileID)
 
 	var filename string
 	err = row.Scan(&filename)
@@ -151,8 +165,13 @@ func (app *Config) handleDeleteFileByID(w http.ResponseWriter, r *http.Request) 
 
 	// find the file in DB
 	var filename string
+
+	// 3 second time limit for db query
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	query := "SELECT filename FROM uploads WHERE id = $1"
-	err = app.Connection.QueryRow(context.Background(), query, fileID).Scan(&filename)
+	err = app.Connection.QueryRow(ctx, query, fileID).Scan(&filename)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			app.respondJSON(w, http.StatusNotFound, "File not found", "")
@@ -170,9 +189,14 @@ func (app *Config) handleDeleteFileByID(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// another 3 second time limit for db query (2nd time so it
+	// wouldn't share the 3 sec from the initial 3 sec context)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel2()
+
 	// remove in DB
 	deleteQuery := "DELETE FROM uploads WHERE id = $1"
-	_, err = app.Connection.Exec(context.Background(), deleteQuery, fileID)
+	_, err = app.Connection.Exec(ctx2, deleteQuery, fileID)
 	if err != nil {
 		app.respondJSON(w, http.StatusInternalServerError, "Failed to delete file record from database", "")
 		return

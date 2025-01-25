@@ -27,7 +27,7 @@ func TestHandleFileUpload(t *testing.T) {
 		AllowedExtensions: allowedExtensions,
 	}
 	r := app.routes()
-	defer app.Connection.Close(context.TODO())
+	defer app.Connection.Close(context.Background())
 
 	// open the file
 	fileToUpload, err := os.Open(pathToTestImage)
@@ -81,7 +81,7 @@ func TestHandleFileUpload(t *testing.T) {
 	// check if file is in DB
 	filename := filepath.Base(pathToTestImage)
 	query := "SELECT filename FROM uploads WHERE filename = $1"
-	row := app.Connection.QueryRow(context.Background(), query, filename)
+	row := app.Connection.QueryRow(context.TODO(), query, filename)
 	var dbFile string
 	row.Scan(&dbFile)
 	if dbFile != filename {
@@ -110,7 +110,7 @@ func TestHandleGetAllFiles(t *testing.T) {
 		AllowedExtensions: allowedExtensions,
 	}
 	r := app.routes()
-	defer app.Connection.Close(context.TODO())
+	defer app.Connection.Close(context.Background())
 
 	req, err := http.NewRequest(http.MethodGet, lc+"/files", nil)
 	if err != nil {
@@ -143,7 +143,7 @@ func TestHandleGetFileByID(t *testing.T) {
 		AllowedExtensions: allowedExtensions,
 	}
 	r := app.routes()
-	defer app.Connection.Close(context.TODO())
+	defer app.Connection.Close(context.Background())
 
 	var randID string
 	query := "SELECT id FROM uploads ORDER BY random() LIMIT 1;"
@@ -177,7 +177,7 @@ func TestHandleDeleteFileByID(t *testing.T) {
 		AllowedExtensions: allowedExtensions,
 	}
 	r := app.routes()
-	defer app.Connection.Close(context.TODO())
+	defer app.Connection.Close(context.Background())
 
 	initStat, err := os.Stat(app.UploadDir)
 	if err != nil {

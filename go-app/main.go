@@ -58,6 +58,7 @@ func main() {
 		Handler: r,
 	}
 
+	// launch server on separate goroutine
 	go func() {
 		log.Println("Starting...")
 		err := server.ListenAndServe()
@@ -66,6 +67,7 @@ func main() {
 		}
 	}()
 
+	// blocker until receive stop signal from system
 	<-stop
 	log.Println("Shutting down...")
 	shutdownCtx, shutdownCancel := context.WithTimeout(ctx, 5*time.Second)
