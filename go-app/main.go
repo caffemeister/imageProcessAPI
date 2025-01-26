@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-var uploadDir = "./../uploads/"
+var uploadDir = "./uploads/"
 var maxFileSize = 10 << 20                                                      // ~10 mb
 var allowedExtensions = []string{"png", "jpg", "jpeg"}                          // allowed types of files
 var usageInfo = "POST: /uploads\nGET: /files, /files/<id>\nDELETE: /files/<id>" // for GET to "/", shows usage
@@ -42,6 +42,9 @@ func main() {
 		AllowedExtensions: allowedExtensions,
 	}
 
+	// check for db table, create if not exist
+	// app.checkDBTable()
+
 	// check for ./uploads/
 	app.checkUploadDirExists()
 
@@ -54,7 +57,7 @@ func main() {
 
 	// set up server
 	server := &http.Server{
-		Addr:    ":8080",
+		Addr:    ":8001",
 		Handler: r,
 	}
 
@@ -86,20 +89,58 @@ func main() {
 }
 
 func connectToDB() *pgx.Conn {
-	connStr := fmt.Sprintf("postgres://%s:%s@localhost:5432/%s?sslmode=disable",
+	connStr := fmt.Sprintf("postgres://%s:%s@postgres:5432/%s?sslmode=disable",
 		os.Getenv("POSTGRES_USER"), os.Getenv("POSTGRES_PASSWORD"), os.Getenv("POSTGRES_USER"))
 
-	conn, err := pgx.Connect(context.Background(), connStr)
+	for i := 1; i <= 10; i++ {
+		conn, err := pgx.Connect(context.Background(), connStr)
+		if err != nil {
+			log.Println("postgres not yet ready...")
+			log.Println(err)
+		} else {
+			log.Println("Connected to database!")
+
+			err = conn.Ping(context.Background())
+			if err != nil {
+				log.Fatal("Failed to ping DB!")
+			}
+			log.Println("Ping successful!")
+
+			log.Println("Established DB connection!")
+			return conn
+		}
+
+		log.Println("backing off for 1 second...")
+		time.Sleep(1 * time.Second)
+	}
+	return nil
+}
+
+func (app *Config) checkDBTable() {
+	query := "SELECT to_regclass('public.uploads');"
+
+	var tableExists string
+	err := app.Connection.QueryRow(context.Background(), query).Scan(&tableExists)
 	if err != nil {
-		log.Fatal("Failed to connect to DB:", err)
+		log.Fatalf("error checking if table exists: %v", err)
 	}
 
-	err = conn.Ping(context.Background())
-	if err != nil {
-		log.Fatal("Failed to ping DB!")
-	}
-	log.Println("Ping successful!")
+	if tableExists == "" {
+		createTableQuery := `
+			CREATE TABLE public.uploads (
+				id SERIAL PRIMARY KEY,
+				filename VARCHAR(255) NOT NULL,
+				filepath TEXT NOT NULL,
+				uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			);
+		`
 
-	log.Println("Established DB connection!")
-	return conn
+		_, err := app.Connection.Exec(context.Background(), createTableQuery)
+		if err != nil {
+			log.Fatalf("Error creating table: %v", err)
+		}
+		fmt.Println("UPLOADS table created!")
+	} else {
+		fmt.Println("UPLOADS table already exists.")
+	}
 }

@@ -7,3 +7,9 @@ down:
 	@echo Stopping docker compose...
 	docker-compose down
 	@echo Done!
+
+build:
+	@echo Building Docker images...
+	docker compose up --build
+	@echo Done!
+	

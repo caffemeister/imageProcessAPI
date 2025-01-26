@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
 
   postgres:
@@ -10,3 +8,35 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
+    volumes:
+      - postgresData:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  python-app:
+    build:
+      context: ./python-app
+      dockerfile: python-service.dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    volumes:
+      - ./uploads:/app/uploads
+
+  go-app:
+    build:
+      context: ./go-app
+      dockerfile: go-app.dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      - python-app
+      - postgres
+    volumes:
+      - ./uploads:/app/uploads
+
+volumes:
+  postgresData:

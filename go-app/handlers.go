@@ -36,6 +36,7 @@ func (app *Config) routes() *chi.Mux {
 	return r
 }
 
+// handles POST to /upscale/<id>
 func (app *Config) handleUpscale(w http.ResponseWriter, r *http.Request) {
 	// retrieve fileid from request
 	fileID, err := strconv.Atoi(chi.URLParam(r, "fileID"))
@@ -65,16 +66,17 @@ func (app *Config) handleUpscale(w http.ResponseWriter, r *http.Request) {
 		"filename": filename,
 	}
 
-	// add data to structure
+	// convert the structure to JSON data
 	jsonData, err := json.Marshal(jsonMap)
 	if err != nil {
 		log.Println("error marshalling data:", err)
 		app.respondJSON(w, http.StatusInternalServerError, "failed to prepare data as JSON", "")
 		return
 	}
+	log.Println(string(jsonData))
 
 	// create a new request to send to python
-	req, err := http.NewRequest(http.MethodPost, "", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest(http.MethodPost, "http://python-app:8000/upscale", bytes.NewBuffer(jsonData))
 	if err != nil {
 		log.Println("error creating request:", err)
 		app.respondJSON(w, http.StatusInternalServerError, "failed to create request", "")
@@ -94,7 +96,10 @@ func (app *Config) handleUpscale(w http.ResponseWriter, r *http.Request) {
 
 	// process response
 	if response.StatusCode != 200 {
+		log.Println(response.StatusCode)
+		log.Println(response)
 		app.respondJSON(w, http.StatusInternalServerError, "bad status received from python service", filename)
+		return
 	}
 
 	// respond to user
