@@ -21,7 +21,7 @@ const lc = "http://localhost:8080"
 func TestHandleFileUpload(t *testing.T) {
 	pathToTestImage := "./../testimage.png"
 	app := &Config{
-		Connection:        connectToDB(),
+		Connection:        connectToDB(), // create a separate connection to db for tests
 		UploadDir:         uploadDir,
 		MaxFileSize:       maxFileSize,
 		AllowedExtensions: allowedExtensions,

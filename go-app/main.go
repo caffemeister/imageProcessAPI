@@ -42,8 +42,7 @@ func main() {
 		AllowedExtensions: allowedExtensions,
 	}
 
-	// check for db table, create if not exist
-	// app.checkDBTable()
+	// need to fix tests
 
 	// check for ./uploads/
 	app.checkUploadDirExists()
@@ -114,33 +113,4 @@ func connectToDB() *pgx.Conn {
 		time.Sleep(1 * time.Second)
 	}
 	return nil
-}
-
-func (app *Config) checkDBTable() {
-	query := "SELECT to_regclass('public.uploads');"
-
-	var tableExists string
-	err := app.Connection.QueryRow(context.Background(), query).Scan(&tableExists)
-	if err != nil {
-		log.Fatalf("error checking if table exists: %v", err)
-	}
-
-	if tableExists == "" {
-		createTableQuery := `
-			CREATE TABLE public.uploads (
-				id SERIAL PRIMARY KEY,
-				filename VARCHAR(255) NOT NULL,
-				filepath TEXT NOT NULL,
-				uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-			);
-		`
-
-		_, err := app.Connection.Exec(context.Background(), createTableQuery)
-		if err != nil {
-			log.Fatalf("Error creating table: %v", err)
-		}
-		fmt.Println("UPLOADS table created!")
-	} else {
-		fmt.Println("UPLOADS table already exists.")
-	}
 }
