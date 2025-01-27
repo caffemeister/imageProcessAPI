@@ -20,8 +20,11 @@ services:
       - "8000:8000"
     depends_on:
       - postgres
+    command: python main.py
     volumes:
       - ./uploads:/app/uploads
+      - ./python-app/.venv/Lib/site-packages/basicsr/data/:/usr/local/lib/python3.12/site-packages/basicsr/data/
+
 
   go-app:
     build:

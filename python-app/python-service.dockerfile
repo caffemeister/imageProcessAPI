@@ -2,20 +2,17 @@
 FROM python:3.12
 
 # Set the working directory inside the container
-WORKDIR /app
+WORKDIR /app/
 
-# Install Poetry globally
-RUN pip install poetry
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0
 
-# Configure Poetry to install dependencies inside the project (not globally)
-ENV POETRY_VIRTUALENVS_IN_PROJECT=true
-ENV POETRY_NO_INTERACTION=1
+# Copy requirements.txt first (for better caching)
+COPY requirements.txt /app/
 
-# Copy Poetry configuration files first (for better caching)
-COPY pyproject.toml poetry.lock /app/
-
-# Install dependencies inside the virtual environment
-RUN poetry install --no-root
+# Install dependencies globally
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code into the container
 COPY . /app/
@@ -24,4 +21,4 @@ COPY . /app/
 EXPOSE 8000
 
 # Ensure the virtual environment is activated before running the app
-CMD ["poetry", "run", "python", "main.py"]
+CMD ["python", "main.py"]
