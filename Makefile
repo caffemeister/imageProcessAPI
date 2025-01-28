@@ -1,6 +1,6 @@
 up:
 	@echo Starting Docker images...
-	POSTGRES_USER=userUser123 POSTGRES_PASSWORD=passwordPsw123 docker compose up -d
+	POSTGRES_USER=${POSTGRES_USER} POSTGRES_PASSWORD=${POSTGRES_PASSWORD} docker compose up -d
 	@echo Docker images started!
 
 down:

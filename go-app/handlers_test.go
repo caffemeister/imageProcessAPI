@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -12,7 +14,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5"
 )
 
@@ -21,8 +25,8 @@ const lc = "http://localhost:8080"
 func TestHandleFileUpload(t *testing.T) {
 	pathToTestImage := "./../testimage.png"
 	app := &Config{
-		Connection:        connectToDB(), // create a separate connection to db for tests
-		UploadDir:         uploadDir,
+		Connection:        connectToDBTest(), // separate connection to db for tests
+		UploadDir:         "../uploads/",     // since not in docker, dir is different
 		MaxFileSize:       maxFileSize,
 		AllowedExtensions: allowedExtensions,
 	}
@@ -104,8 +108,8 @@ func TestHandleFileUpload(t *testing.T) {
 
 func TestHandleGetAllFiles(t *testing.T) {
 	app := &Config{
-		Connection:        connectToDB(),
-		UploadDir:         uploadDir,
+		Connection:        connectToDBTest(), // separate connection to db for tests
+		UploadDir:         "../uploads/",     // since not in docker, dir is different
 		MaxFileSize:       maxFileSize,
 		AllowedExtensions: allowedExtensions,
 	}
@@ -137,8 +141,8 @@ func TestHandleGetAllFiles(t *testing.T) {
 
 func TestHandleGetFileByID(t *testing.T) {
 	app := &Config{
-		Connection:        connectToDB(),
-		UploadDir:         uploadDir,
+		Connection:        connectToDBTest(), // separate connection to db for tests
+		UploadDir:         "../uploads/",     // since not in docker, dir is different
 		MaxFileSize:       maxFileSize,
 		AllowedExtensions: allowedExtensions,
 	}
@@ -171,8 +175,8 @@ func TestHandleGetFileByID(t *testing.T) {
 
 func TestHandleDeleteFileByID(t *testing.T) {
 	app := &Config{
-		Connection:        connectToDB(),
-		UploadDir:         uploadDir,
+		Connection:        connectToDBTest(), // separate connection to db for tests
+		UploadDir:         "../uploads/",     // since not in docker, dir is different
 		MaxFileSize:       maxFileSize,
 		AllowedExtensions: allowedExtensions,
 	}
@@ -220,4 +224,37 @@ func TestHandleDeleteFileByID(t *testing.T) {
 	if initStat == newStat {
 		t.Error("File wasn't deleted")
 	}
+}
+
+func connectToDBTest() *pgx.Conn {
+	connStr := fmt.Sprintf("postgres://%s:%s@0.0.0.0:5432/%s?sslmode=disable",
+		os.Getenv("POSTGRES_USER"), os.Getenv("POSTGRES_PASSWORD"), os.Getenv("POSTGRES_USER"))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	for i := 1; i <= 10; i++ {
+		conn, err := pgx.Connect(ctx, connStr)
+		if err != nil {
+			log.Println("postgres not yet ready...")
+			log.Println(err)
+		} else {
+			log.Println("Connected to database!")
+			time.Sleep(1 * time.Second)
+
+			err = conn.Ping(ctx)
+			if err != nil {
+				log.Fatal("Failed to ping DB!")
+				conn.Close(ctx)
+			}
+			log.Println("Ping successful!")
+
+			log.Println("Established DB connection!")
+			return conn
+		}
+
+		log.Println("backing off for 1 second...")
+		time.Sleep(1 * time.Second)
+	}
+	return nil
 }

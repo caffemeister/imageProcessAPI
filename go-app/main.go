@@ -35,8 +35,13 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	dbConn := connectToDB()
+	if dbConn == nil {
+		log.Fatal("couldn't connect to DB")
+	}
+
 	app := &Config{
-		Connection:        connectToDB(),
+		Connection:        dbConn,
 		UploadDir:         uploadDir,
 		MaxFileSize:       maxFileSize,
 		AllowedExtensions: allowedExtensions,
@@ -47,9 +52,6 @@ func main() {
 	// check for ./uploads/
 	app.checkUploadDirExists()
 
-	// create a new router
-	r := app.routes()
-
 	// channel to listen for OS signals
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
@@ -57,7 +59,7 @@ func main() {
 	// set up server
 	server := &http.Server{
 		Addr:    ":8001",
-		Handler: r,
+		Handler: app.routes(),
 	}
 
 	// launch server on separate goroutine
@@ -80,8 +82,10 @@ func main() {
 	}
 
 	log.Println("Closing DB connection...")
-	if err := app.Connection.Close(shutdownCtx); err != nil {
-		log.Fatalf("Failed to close connection to DB: %v", err)
+	if app.Connection != nil {
+		if err := app.Connection.Close(shutdownCtx); err != nil {
+			log.Fatalf("Failed to close connection to DB: %v", err)
+		}
 	}
 
 	log.Println("Shutdown successful! Bye.")
@@ -91,17 +95,22 @@ func connectToDB() *pgx.Conn {
 	connStr := fmt.Sprintf("postgres://%s:%s@postgres:5432/%s?sslmode=disable",
 		os.Getenv("POSTGRES_USER"), os.Getenv("POSTGRES_PASSWORD"), os.Getenv("POSTGRES_USER"))
 
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	for i := 1; i <= 10; i++ {
-		conn, err := pgx.Connect(context.Background(), connStr)
+		conn, err := pgx.Connect(ctx, connStr)
 		if err != nil {
 			log.Println("postgres not yet ready...")
 			log.Println(err)
 		} else {
 			log.Println("Connected to database!")
+			time.Sleep(1 * time.Second)
 
-			err = conn.Ping(context.Background())
+			err = conn.Ping(ctx)
 			if err != nil {
 				log.Fatal("Failed to ping DB!")
+				conn.Close(ctx)
 			}
 			log.Println("Ping successful!")
 
