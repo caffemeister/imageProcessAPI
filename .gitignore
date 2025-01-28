@@ -2,3 +2,5 @@
 task_description.md
 testimage.png
 creds.txt
+.idea/
+!./python-app/.venv/Lib/site-packages/basicsr/data/
