@@ -14,9 +14,9 @@ import (
 )
 
 var uploadDir = "./uploads/"
-var maxFileSize = 10 << 20                                                      // ~10 mb
-var allowedExtensions = []string{"png", "jpg", "jpeg"}                          // allowed types of files
-var usageInfo = "POST: /uploads\nGET: /files, /files/<id>\nDELETE: /files/<id>" // for GET to "/", shows usage
+var maxFileSize = 10 << 20                                                                    // ~10 mb
+var allowedExtensions = []string{"png", "jpg", "jpeg"}                                        // allowed types of files
+var usageInfo = "POST: /upload, /upscale/<id>\nGET: /files, /files/<id>\nDELETE: /files/<id>" // for GET to "/", shows usage
 
 type Config struct {
 	Connection        *pgx.Conn
