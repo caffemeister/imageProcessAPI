@@ -47,8 +47,6 @@ func main() {
 		AllowedExtensions: allowedExtensions,
 	}
 
-	// need to fix tests
-
 	// check for ./uploads/
 	app.checkUploadDirExists()
 
