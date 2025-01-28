@@ -2,7 +2,8 @@
 task_description.md
 testimage.png
 creds.txt
-.idea/
+/.idea/
+/python-app/.venv/__pycache__/*
 !/python-app/.venv/Lib/site-packages/basicsr/data/
 /python-app/models/*
 !/python-app/models/readme.md
