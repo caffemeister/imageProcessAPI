@@ -3,6 +3,6 @@ task_description.md
 testimage.png
 creds.txt
 .idea/
-!./python-app/.venv/Lib/site-packages/basicsr/data/
-./python-app/models
-!./python-app/models/readme.md
+!/python-app/.venv/Lib/site-packages/basicsr/data/
+/python-app/models/*
+!/python-app/models/readme.md
