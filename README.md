@@ -1,6 +1,6 @@
 I set out to build a project that would use Python and Go together, and this was the result.
 
-It's an image upscaler thats entirely docker-based, and contains a GO API with a Postgres DB that talks with to a Python image upscaling script to upscale images.
+It's an image upscaler thats entirely docker-based, and contains a Go API with a Postgres DB that talks with a Python script to upscale images.
 
 ----------------------------------------------------------------
 In order for the upscaler to work, a pre-trained model is needed.
